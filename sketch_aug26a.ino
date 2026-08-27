@@ -38,7 +38,7 @@ void setup() {
   // กำลังส่งจริง
   // -9 dBm เริ่มทดลองสำหรับประมาณ 3-5 เมตร
   BLEDevice::setPower(
-    ESP_PWR_LVL_N9,
+    ESP_PWR_LVL_P6,
     ESP_BLE_PWR_TYPE_ADV
   );
 
