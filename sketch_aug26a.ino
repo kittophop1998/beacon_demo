@@ -4,68 +4,81 @@
 #include <BLEBeacon.h>
 
 // =====================================================
-// BEACON CONFIG
+// BEACON IDENTITY
 // =====================================================
 
-// ชื่อ Beacon สำหรับให้คนอ่านง่าย
 #define BEACON_NAME "BEACON-A01"
 
-// iBeacon UUID
 #define BEACON_UUID "57dcd1b1-ed48-49b6-8aff-e7a4bfb390da"
 
-// Logical identifier
 #define BEACON_MAJOR 1
 #define BEACON_MINOR 1
 
-// =====================================================
-// RF TX POWER
-// =====================================================
-//
-// นี่คือกำลังส่ง BLE จริง
-//
-// ESP_PWR_LVL_N12 = -12 dBm
-// ESP_PWR_LVL_N9  =  -9 dBm
-// ESP_PWR_LVL_N6  =  -6 dBm
-// ESP_PWR_LVL_N3  =  -3 dBm
-// ESP_PWR_LVL_N0  =   0 dBm
-// ESP_PWR_LVL_P3  =  +3 dBm
-// ESP_PWR_LVL_P6  =  +6 dBm
-// ESP_PWR_LVL_P9  =  +9 dBm
-//
-
-#define BEACON_TX_POWER_LEVEL ESP_PWR_LVL_P6
 
 // =====================================================
-// iBeacon Measured Power
+// BLE RF TX POWER
 // =====================================================
 //
-// ค่านี้ไม่ใช่กำลังส่ง RF
+// กำลังส่งจริงของ ESP32-C3
 //
-// มันคือ RSSI ที่ receiver "ควรได้รับ"
-// เมื่ออยู่ห่าง Beacon ประมาณ 1 เมตร
+// N12 = -12 dBm
+// N9  =  -9 dBm
+// N6  =  -6 dBm
+// N3  =  -3 dBm
+// N0  =   0 dBm
+// P3  =  +3 dBm
+// P6  =  +6 dBm
+// P9  =  +9 dBm
 //
-// ตอนนี้เริ่มไว้ที่ -59 dBm
-// ควร calibration จากของจริงภายหลัง
+
+#define BEACON_RF_TX_LEVEL ESP_PWR_LVL_P6
+
+
+// =====================================================
+// IBEACON MEASURED POWER
+// =====================================================
 //
+// ค่านี้ไม่ใช่กำลังส่งของ ESP32
+//
+// เป็น RSSI calibration ที่ receiver วัดได้
+// เมื่ออยู่ห่าง Beacon 1 เมตร
+//
+// ต้องวัดจาก Beacon ตัวจริงแล้วมาแก้ค่านี้
+//
+// ตัวอย่าง:
+// ถ้าวัดที่ 1m แล้วค่าเฉลี่ยเป็น -63
+// ให้เปลี่ยนเป็น:
+//
+// #define BEACON_MEASURED_POWER -63
+//
+// ตอนนี้ใช้ -59 เป็นค่าเริ่มต้นชั่วคราวเท่านั้น
+//
+
 #define BEACON_MEASURED_POWER -59
 
-// =====================================================
-// ADVERTISING
-// =====================================================
 
-// BLE advertising interval
-// 160 * 0.625 ms = 100 ms
+// =====================================================
+// ADVERTISING INTERVAL
+// =====================================================
+//
+// BLE unit = 0.625 ms
+//
+// 160 = 100 ms
+// ประมาณ 10 advertisements / second
+//
+
 #define BEACON_ADV_INTERVAL 160
+
 
 BLEAdvertising* advertising;
 
 
 // =====================================================
-// TX POWER DISPLAY
+// RF POWER DISPLAY
 // =====================================================
 
-int getTxPowerDbm() {
-  switch (BEACON_TX_POWER_LEVEL) {
+int getRfTxPowerDbm() {
+  switch (BEACON_RF_TX_LEVEL) {
     case ESP_PWR_LVL_N12:
       return -12;
 
@@ -102,11 +115,11 @@ int getTxPowerDbm() {
 
 void setup() {
   Serial.begin(115200);
-
   delay(1000);
 
   Serial.println();
-  Serial.println("Starting iBeacon...");
+  Serial.println("Starting Beacon...");
+
 
   // =====================================================
   // BLE INIT
@@ -114,11 +127,16 @@ void setup() {
 
   BLEDevice::init(BEACON_NAME);
 
-  // กำลังส่ง RF จริง
+
+  // =====================================================
+  // SET REAL RF TX POWER
+  // =====================================================
+
   BLEDevice::setPower(
-    BEACON_TX_POWER_LEVEL,
+    BEACON_RF_TX_LEVEL,
     ESP_BLE_PWR_TYPE_ADV
   );
+
 
   // =====================================================
   // CREATE IBEACON
@@ -126,21 +144,23 @@ void setup() {
 
   BLEBeacon beacon;
 
-  // Apple Manufacturer ID สำหรับ iBeacon
+  // Apple Manufacturer ID
   beacon.setManufacturerId(0x004C);
 
+  // UUID
   beacon.setProximityUUID(
     BLEUUID(BEACON_UUID)
   );
 
+  // Beacon identity
   beacon.setMajor(BEACON_MAJOR);
-
   beacon.setMinor(BEACON_MINOR);
 
-  // RSSI calibration ที่ระยะ 1 เมตร
+  // RSSI reference at 1 meter
   beacon.setSignalPower(
     BEACON_MEASURED_POWER
   );
+
 
   // =====================================================
   // ADVERTISEMENT DATA
@@ -154,23 +174,24 @@ void setup() {
     beacon.getData()
   );
 
+
   // =====================================================
   // SCAN RESPONSE
   // =====================================================
 
   BLEAdvertisementData scanResponseData;
 
-  // ทำให้ scanner เห็นชื่อ BEACON-A01
+  // ให้ Scanner เห็นชื่อ BEACON-A01
   scanResponseData.setName(
     BEACON_NAME
   );
+
 
   // =====================================================
   // START ADVERTISING
   // =====================================================
 
-  advertising =
-    BLEDevice::getAdvertising();
+  advertising = BLEDevice::getAdvertising();
 
   advertising->setAdvertisementData(
     advertisementData
@@ -180,7 +201,7 @@ void setup() {
     scanResponseData
   );
 
-  // Scan ได้ แต่ connect ไม่ได้
+  // Scanner อ่านได้ แต่ Connect ไม่ได้
   advertising->setAdvertisementType(
     ADV_TYPE_SCAN_IND
   );
@@ -195,6 +216,7 @@ void setup() {
 
   advertising->start();
 
+
   // =====================================================
   // DEBUG
   // =====================================================
@@ -202,42 +224,42 @@ void setup() {
   Serial.println();
   Serial.println("================================");
 
-  Serial.println("iBeacon started");
+  Serial.println("Beacon started");
 
   Serial.println("================================");
 
   Serial.printf(
-    "Name           : %s\n",
+    "Name            : %s\n",
     BEACON_NAME
   );
 
   Serial.printf(
-    "UUID           : %s\n",
+    "UUID            : %s\n",
     BEACON_UUID
   );
 
   Serial.printf(
-    "Major          : %d\n",
+    "Major           : %d\n",
     BEACON_MAJOR
   );
 
   Serial.printf(
-    "Minor          : %d\n",
+    "Minor           : %d\n",
     BEACON_MINOR
   );
 
   Serial.printf(
-    "RF TX Power    : %+d dBm\n",
-    getTxPowerDbm()
+    "RF TX Power     : %+d dBm\n",
+    getRfTxPowerDbm()
   );
 
   Serial.printf(
-    "Measured Power : %d dBm @ 1m\n",
+    "Measured Power  : %d dBm\n",
     BEACON_MEASURED_POWER
   );
 
   Serial.printf(
-    "ADV Interval   : %.1f ms\n",
+    "ADV Interval    : %.1f ms\n",
     BEACON_ADV_INTERVAL * 0.625
   );
 
@@ -245,7 +267,11 @@ void setup() {
 }
 
 
+// =====================================================
+// LOOP
+// =====================================================
+
 void loop() {
-  // Broadcast only
+  // BLE stack ทำ Advertising อยู่เบื้องหลัง
   delay(10000);
 }
